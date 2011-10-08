@@ -1,0 +1,39 @@
+#!/bin/bash
+# Creates a full backup every Sunday and incremental backups Mon-Sat
+# Based on script found at www.faqs.org/docs/securing/chap29sec306.html
+# For this setup, operating system files are stored on root directory /,
+# documents and music files are stored on a secondary hard drive.
+
+COMPUTER=computerName
+BACKUPDIR="/path/to/backupDirectory1"   # tar file is backed up to both directories
+BACKUPDIR2="/path/to/backupDirectory2"  # (these should be on two different hdds)
+EXCLUDE="/path/to/exclude/file"         # list of directories to exclude in backup
+LASTFULL=$BACKUPDIR"/_"$COMPUTER"-lastfull"
+
+DOW=`date +%a`
+
+# Full backup every Sunday 
+if [ "$DOW" = "Sun" ] || [ ! -f $LASTFULL ]; then
+	echo "beginning full backup..."
+	NOW=`date +%d-%b`
+	
+	echo $NOW > $BACKUPDIR/_$COMPUTER-lastfull
+	tar cpf $BACKUPDIR/$COMPUTER-$DOW.tar -C / -X $EXCLUDE /
+# Incremental backup every other day
+else
+	echo "beginning incremental backup"
+	NEWER=`cat $LASTFULL`
+	tar cpf $BACKUPDIR/$COMPUTER-$DOW.tar -C / -X $EXCLUDE -N $NEWER /
+fi	
+
+# Copy the tar file to a second hard drive
+echo "copying tar to $BACKUPDIR2"
+cp -f $BACKUPDIR/$COMPUTER-$DOW.tar $BACKUPDIR2/$COMPUTER-$DOW.tar
+
+# Use rsync to sync documents and music files between two different hard drives
+echo "backing up documents"
+rsync -rltuv --size-only /path/to/documents/ /path/to/documentsBackups/ >> /home/user/backup/logs/doc.log
+
+echo "backing up music"
+rsync -rltuv --size-only /path/to/music/ /path/to/musicBackups/ >> /home/user/backup/logs/mus.log
+
